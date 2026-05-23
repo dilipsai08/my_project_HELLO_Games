@@ -15,7 +15,6 @@ import morgan from "morgan";
 import helmet from "helmet";
 import connectPgSimple from "connect-pg-simple";
 import { Resend } from "resend";
-// import socketIO from "socket.io";
 import db from "./db.js";
 import { isAuthenticated } from "./Middlewares/auth_middleware.js";
 import is_Valid from "./Middlewares/Validation_middleware.js";
@@ -33,7 +32,7 @@ app.use(helmet());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cors({
-    origin: frontendURL,//we need to provide the url of the frontend here to communicate with backend
+    origin: frontendURL,
     credentials: true,
 }));
 const pgSession = connectPgSimple(session);
@@ -45,7 +44,7 @@ app.use(
         store: new pgSession({
             pool: db,
             tableName: process.env.PG_SESSION,
-            pruneSessionInterval: 60 * 60,//it remove the expired session from the db
+            pruneSessionInterval: 60 * 60,
         }),
         cookie: {
             maxAge: 30 * 24 * 60 * 60 * 1000,
@@ -60,7 +59,7 @@ const resend = new Resend(process.env.RESEND_EMAIL_API_KEY);
 
 app.use(Passport.initialize());
 app.use(Passport.session());
-app.use(morgan("dev")); //morgan it show all the HTTPS request in the my dev console
+app.use(morgan("dev"));
 
 function getOAuthEmail(profile) {
     const email = profile?.email || profile?.emails?.[0]?.value || profile?._json?.email;
@@ -103,7 +102,6 @@ app.post("/register", is_Valid, async (req, res, next) => {
                 );
                 const user = result.rows[0];
 
-                // Clear the OTP from session on successful registration
                 req.session.otp = null;
 
                     req.login(user, (loginErr) => {
