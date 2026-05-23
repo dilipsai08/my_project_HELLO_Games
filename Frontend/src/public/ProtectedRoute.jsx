@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import axios from "axios";
+import API from "../Components/Protected compo/api";
 
 const ProtectedRoute = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(null);
 
     useEffect(() => {
-        axios.get("http://localhost:3000/api/check-auth", {
-            withCredentials: true 
-        })
+        API.get("/api/check-auth")
             .then(response => {
                 if (response.data.isAuthenticated) {
                     setIsAuthenticated(true);

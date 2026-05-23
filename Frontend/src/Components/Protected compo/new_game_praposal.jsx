@@ -2,15 +2,32 @@ import React from "react";
 import Header from "../header";
 import Footer from "../footer";
 
+const pageShell =
+    "min-h-screen flex flex-col bg-linear-to-b from-green-950 via-gray-950 to-black text-orange-100 font-sans";
+const wideSection =
+    "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8";
+const primaryLink =
+    "inline-flex justify-center rounded-full bg-linear-to-r from-orange-500 to-yellow-500 px-8 py-3 font-bold text-white shadow-lg shadow-orange-950/40 hover:-translate-y-1 hover:shadow-orange-500/30 transition-all duration-300";
+const secondaryLink =
+    "inline-flex justify-center rounded-full border border-orange-400/30 bg-white/5 px-8 py-3 font-bold text-orange-200 hover:bg-orange-500/10 transition-colors duration-300";
+const creatorBadge =
+    "inline-flex w-fit rounded-full border border-orange-400/30 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-300";
+const infoCard =
+    "rounded-2xl border border-green-700/50 bg-green-900/35 p-6";
+const glassPanel =
+    "rounded-2xl border border-orange-400/20 bg-white/5 p-6";
+const emailLink =
+    "inline-flex rounded-full bg-linear-to-r from-orange-500 to-yellow-500 px-8 py-3 font-bold text-white hover:-translate-y-1 transition-transform duration-300";
+
 function NewGamePraposal() {
     return (
-        <div className="min-h-screen flex flex-col bg-linear-to-b from-green-950 via-gray-950 to-black text-orange-100 font-sans">
+        <div className={pageShell}>
             <Header />
 
             <main className="grow">
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 grid lg:grid-cols-[1.2fr_0.8fr] gap-10 items-center">
+                <section className={`${wideSection} py-16 md:py-24 grid lg:grid-cols-[1.2fr_0.8fr] gap-10 items-center`}>
                     <div className="space-y-7">
-                        <span className="inline-flex w-fit rounded-full border border-orange-400/30 bg-orange-500/10 px-4 py-2 text-sm font-semibold text-orange-300">
+                        <span className={creatorBadge}>
                             Creator Program
                         </span>
 
@@ -29,27 +46,27 @@ function NewGamePraposal() {
                         <div className="flex flex-col sm:flex-row gap-4">
                             <a
                                 href="#submit-game"
-                                className="inline-flex justify-center rounded-full bg-linear-to-r from-orange-500 to-yellow-500 px-8 py-3 font-bold text-white shadow-lg shadow-orange-950/40 hover:-translate-y-1 hover:shadow-orange-500/30 transition-all duration-300"
+                                className={primaryLink}
                             >
                                 Submit Your Game
                             </a>
                             <a
                                 href="#guidelines"
-                                className="inline-flex justify-center rounded-full border border-orange-400/30 bg-white/5 px-8 py-3 font-bold text-orange-200 hover:bg-orange-500/10 transition-colors duration-300"
+                                className={secondaryLink}
                             >
                                 View Guidelines
                             </a>
                         </div>
                     </div>
 
-                    <div className="rounded-2xl border border-orange-400/20 bg-white/5 p-6 shadow-2xl shadow-black/30 backdrop-blur">
+                    <div className={`${glassPanel} shadow-2xl shadow-black/30 backdrop-blur`}>
                         <h2 className="text-2xl font-bold text-white mb-4">Why publish here?</h2>
                         <div className="space-y-4 text-orange-100/75">
                             <p>
                                 HELLO Games is built for quick, creative, browser-friendly games that players can enjoy instantly.
                             </p>
                             <p>
-                                Your game will be featured alongside beloved community favorites such as Dice Duel, Simon Says, Lava Escape, and Reaction Speed.                            </p>
+                                Your game will be featured alongside beloved community favorites such as Dice Duel, Simon Says, Magma Maze, and Reaction Speed.                            </p>
                             <p>
                                 We focus on clean gameplay, simple controls, fast loading, and ideas that are easy to understand but fun to replay.
                             </p>
@@ -57,22 +74,22 @@ function NewGamePraposal() {
                     </div>
                 </section>
 
-                <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid md:grid-cols-3 gap-6">
-                    <article className="rounded-2xl border border-green-700/50 bg-green-900/35 p-6">
+                <section className={`${wideSection} py-12 grid md:grid-cols-3 gap-6`}>
+                    <article className={infoCard}>
                         <h2 className="text-xl font-bold text-white mb-3">Reach players</h2>
                         <p className="text-orange-100/70">
                             Put your game in front of people who already visit HELLO Games to discover short, fun challenges.
                         </p>
                     </article>
 
-                    <article className="rounded-2xl border border-green-700/50 bg-green-900/35 p-6">
+                    <article className={infoCard}>
                         <h2 className="text-xl font-bold text-white mb-3">Show your skills</h2>
                         <p className="text-orange-100/70">
                             Add your name, game description, controls, screenshots, and creator notes so your work feels complete.
                         </p>
                     </article>
 
-                    <article className="rounded-2xl border border-green-700/50 bg-green-900/35 p-6">
+                    <article className={infoCard}>
                         <h2 className="text-xl font-bold text-white mb-3">Improve with feedback</h2>
                         <p className="text-orange-100/70">
                             Get review notes on bugs, loading issues, design clarity, and player experience before your game goes live.
@@ -80,8 +97,8 @@ function NewGamePraposal() {
                     </article>
                 </section>
 
-                <section id="guidelines" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid lg:grid-cols-2 gap-8">
-                    <div className="rounded-2xl border border-orange-400/20 bg-white/5 p-6">
+                <section id="guidelines" className={`${wideSection} py-12 grid lg:grid-cols-2 gap-8`}>
+                    <div className={glassPanel}>
                         <h2 className="text-2xl font-bold text-white mb-5">Submission checklist</h2>
                         <ul className="space-y-3 text-orange-100/75">
                             <li>Game title and short description.</li>
@@ -92,7 +109,7 @@ function NewGamePraposal() {
                         </ul>
                     </div>
 
-                    <div className="rounded-2xl border border-orange-400/20 bg-white/5 p-6">
+                    <div className={glassPanel}>
                         <h2 className="text-2xl font-bold text-white mb-5">What we look for</h2>
                         <ul className="space-y-3 text-orange-100/75">
                             <li>Fast loading and smooth performance.</li>
@@ -114,7 +131,7 @@ function NewGamePraposal() {
                             href="https://mail.google.com/mail/?view=cm&fs=1&to=dilipsai045@gmail.com&su=Game%20Submission%20Proposal%20"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex rounded-full bg-linear-to-r from-orange-500 to-yellow-500 px-8 py-3 font-bold text-white hover:-translate-y-1 transition-transform duration-300"
+                            className={emailLink}
                         >
                             Email Game Proposal
                         </a>

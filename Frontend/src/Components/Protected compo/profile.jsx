@@ -1,148 +1,168 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import API from "./api";
 import Header from "../header";
 import Footer from "../footer";
 
+const prof_page =
+    "min-h-screen flex flex-col bg-linear-to-b from-green-950 to-zinc-950 text-orange-100 font-sans";
+const state_Screen =
+    "flex flex-col items-center justify-center min-h-[50vh]";
+const prof_card =
+    "rounded-2xl border border-white/10 bg-white/5 p-6 hover:border-orange-500/20 transition-all duration-300";
+const card_heading =
+    "text-base font-bold text-white border-b border-white/5 pb-3 mb-4 flex items-center gap-2";
+const field_label =
+    "text-xs text-orange-200/50 block uppercase tracking-wider";
+const err_icon =
+    "w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 text-xl font-bold";
+const avatar =
+    "inline-flex w-20 h-20 rounded-full bg-orange-500 items-center justify-center text-3xl font-black text-white shadow-md select-none";
+const online_bdge =
+    "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-green-400 bg-green-500/10 border border-green-500/20";
+const log_out_btn =
+    "flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-red-400 border border-red-500/20 bg-red-500/5 hover:bg-red-500 hover:text-white transition-all duration-200 cursor-pointer active:scale-95";
+
 function Profile() {
+    const navigate = useNavigate();
     const [user, setuser] = useState(null);
     const [isloading, setloading] = useState(true);
     const [err, seterr] = useState(null);
 
     useEffect(() => {
-        axios.get("http://localhost:3000/api/check-auth", {
-            withCredentials: true,
-        })
+        API.get("/api/check-auth")
             .then((res) => {
                 if (res.data.isAuthenticated) {
                     setuser(res.data.user);
                     setloading(false);
                 } else {
-                    // Fallback to dummy player data for preview purposes
-                    setuser({
-                        name: "Alex Mercer",
-                        username: "GamerPro99",
-                        email: "alex.mercer@hellogames.com",
-                        phone: "+1 (555) 019-2834",
-                        id: "USR-882910-X",
-                        total_played: "142",
-                        high_score: "9,850 pts",
-                        achievements_count: "24 / 30"
-                    });
+                    seterr("Not Authenticated")
                     setloading(false);
                 }
             })
             .catch((err) => {
-                console.error("Error while fetching, using preview fallback:", err);
-                // Fallback to dummy player data if server is offline
-                setuser({
-                    name: "Alex Mercer",
-                    username: "GamerPro99",
-                    email: "alex.mercer@hellogames.com",
-                    phone: "+1 (555) 019-2834",
-                    id: "USR-882910-X",
-                    total_played: "142",
-                    high_score: "9,850 pts",
-                    achievements_count: "24 / 30"
-                });
+                console.error("Error while fetching :(", err);
+                seterr("Error while fetching profile...")
                 setloading(false);
             });
     }, []);
 
+    const handleLogout = () => {
+        API.get("/logout")
+            .then(() => {
+                navigate("/");
+            })
+            .catch((err) => {
+                console.error("Logout failed, redirecting anyway:", err);
+                navigate("/profile");
+            });
+    };
+
     return (
-        <div className="min-h-screen flex flex-col bg-white text-neutral-800 font-mono">
+        <div className={prof_page}>
             <Header />
 
-            <main className="grow max-w-5xl w-full mx-auto px-4 sm:px-6 py-10 flex flex-col justify-center">
+            <main className="grow max-w-4xl w-full mx-auto px-4 sm:px-6 py-12 flex flex-col justify-center">
                 {isloading ? (
-                    <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
-                        <div className="w-10 h-10 rounded-full border-4 border-neutral-200 border-t-orange-500 animate-spin"></div>
-                        <span className="text-orange-600 text-sm animate-pulse">Loading Profile...</span>
+                    <div className={`${state_Screen} gap-3`}>
+                        <div className="w-8 h-8 rounded-full border-3 border-orange-500/20 border-t-orange-500 animate-spin"></div>
+                        <span className="text-orange-400 text-sm font-medium animate-pulse">Loading Profile...</span>
                     </div>
                 ) : err ? (
-                    <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 text-center">
-                        <h2 className="text-xl font-sans font-semibold text-red-600">{err}</h2>
+                    <div className={`${state_Screen} gap-4 text-center`}>
+                        <div className={err_icon}>!</div>
+                        <h2 className="text-lg font-semibold text-red-400">{err}</h2>
                     </div>
                 ) : user ? (
-                    <div className="space-y-8 max-w-3xl mx-auto w-full">
-
-                        {/* Hero Section */}
-                        <div className="text-center space-y-3 pb-4">
-                            {/* Avatar with gradient ring */}
-                            <div className="inline-block w-24 h-24 rounded-full bg-linear-to-tr from-green-600 to-orange-500 p-[3px] shadow-lg hover:scale-105 transition-transform duration-300 cursor-pointer">
-                                <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-3xl font-black text-green-700 select-none">
-                                    {(user.name || user.username || "?")[0].toUpperCase()}
-                                </div>
+                    <div className="w-full space-y-8">
+                        {/* Profile Header Block */}
+                        <div className="text-center space-y-4 pb-6 border-b border-white/5">
+                            {/* Simple Solid Circular Avatar */}
+                            <div className={avatar}>
+                                {(user.name || user.username || "?")[0].toUpperCase()}
                             </div>
 
-                            {/* Greeting with logo-hover on HELLO */}
-                            <h1 className="text-3xl font-black text-neutral-900 mt-2 flex items-center justify-center gap-1 flex-wrap">
-                                <span className="inline-block bg-linear-to-r from-orange-600 to-yellow-500 bg-clip-text text-transparent tracking-tight cursor-pointer select-none hover:scale-110 hover:drop-shadow-[0_4px_12px_rgba(249,115,22,0.45)] active:scale-95 transition-all duration-300">
+                            {/* Clean Greeting */}
+                            <h1 className="text-3xl font-bold text-white tracking-tight flex items-center justify-center gap-1.5">
+                                <span className="bg-linear-to-r from-orange-500 to-yellow-400 bg-clip-text text-transparent">
                                     HELLO
                                 </span>
-                                <span className="text-neutral-800">, {user.name || user.username}</span>
+                                <span>, {user.name || user.username}</span>
                             </h1>
-
-                            {/* Status badge */}
-                            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold text-green-700 bg-green-50 border border-green-200">
-                                ● Online Player
-                            </span>
+                            {/* Status Indicator & Simple Red Logout Button */}
+                            <div className="flex items-center justify-center gap-4">
+                                <span className={online_bdge}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                                    Online Player
+                                </span>
+                                <button
+                                    onClick={handleLogout}
+                                    className={log_out_btn}
+                                >
+                                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                        <polyline points="16 17 21 12 16 7" />
+                                        <line x1="21" y1="12" x2="9" y2="12" />
+                                    </svg>
+                                    Logout
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Cards Grid */}
+                        {/* Cohesive Simple Grid Cards */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
                             {/* Card 1: Account Information */}
-                            <div className="rounded-2xl border border-neutral-200 bg-white p-6 space-y-4 shadow-sm hover:shadow-md transition-shadow duration-300">
-                                <h2 className="text-lg font-bold text-neutral-900 border-b border-neutral-100 pb-2 flex items-center gap-2">
-                                    <span className="text-orange-500">⚙</span> Account Details
+                            <div className={prof_card}>
+                                <h2 className={card_heading}>
+                                    <span className="text-orange-400">⚙</span> Account Information
                                 </h2>
-                                <div className="space-y-3.5 text-sm">
+                                <div className="space-y-4">
                                     <div>
-                                        <span className="text-[11px] text-neutral-400 block uppercase tracking-widest mb-0.5">Name</span>
-                                        <span className="text-neutral-800 font-semibold">{user.name || "N/A"}</span>
+                                        <span className={`${field_label} mb-0.5`}>Name</span>
+                                        <span className="text-white font-medium">{user.name || "N/A"}</span>
                                     </div>
                                     <div>
-                                        <span className="text-[11px] text-neutral-400 block uppercase tracking-widest mb-0.5">Username</span>
-                                        <span className="text-neutral-800 font-semibold">{user.username}</span>
+                                        <span className={`${field_label} mb-0.5`}>Username</span>
+                                        <span className="text-white font-medium">@{user.username}</span>
                                     </div>
                                     <div>
-                                        <span className="text-[11px] text-neutral-400 block uppercase tracking-widest mb-0.5">Email Address</span>
-                                        <span className="text-neutral-800 font-semibold truncate block">{user.email}</span>
+                                        <span className={`${field_label} mb-0.5`}>Email Address</span>
+                                        <span className="text-white font-medium truncate block">{user.email}</span>
                                     </div>
                                     <div>
-                                        <span className="text-[11px] text-neutral-400 block uppercase tracking-widest mb-0.5">Phone Number</span>
-                                        <span className="text-neutral-800 font-semibold">{user.phone || "Not Configured"}</span>
+                                        <span className={`${field_label} mb-0.5`}>Phone Number</span>
+                                        <span className="text-white font-medium">{user.phone || "Not Configured"}</span>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Card 2: Player Statistics */}
-                            <div className="rounded-2xl border border-neutral-200 bg-white p-6 space-y-4 shadow-sm hover:shadow-md transition-shadow duration-300">
-                                <h2 className="text-lg font-bold text-neutral-900 border-b border-neutral-100 pb-2 flex items-center gap-2">
-                                    <span className="text-yellow-500">🏆</span> Player Statistics
+                            <div className={prof_card}>
+                                <h2 className={card_heading}>
+                                    <span className="text-yellow-400">🏆</span> Player Statistics
                                 </h2>
-                                <div className="space-y-3.5 text-sm">
+                                <div className="space-y-4">
                                     <div>
-                                        <span className="text-[11px] text-neutral-400 block uppercase tracking-widest mb-0.5">Total Games Played</span>
-                                        <span className="text-orange-600 font-extrabold text-2xl">
+                                        <span className={`${field_label} mb-1`}>Total Games Played</span>
+                                        <span className="text-orange-400 font-extrabold text-2xl">
                                             {user.total_played || "0"}
                                         </span>
                                     </div>
                                     <div>
-                                        <span className="text-[11px] text-neutral-400 block uppercase tracking-widest mb-0.5">High Score</span>
-                                        <span className="text-yellow-600 font-extrabold text-2xl">
+                                        <span className={`${field_label} mb-1`}>High Score</span>
+                                        <span className="text-yellow-400 font-extrabold text-2xl">
                                             {user.high_score || "0"}
                                         </span>
                                     </div>
                                     <div>
-                                        <span className="text-[11px] text-neutral-400 block uppercase tracking-widest mb-0.5">Player ID</span>
-                                        <span className="text-neutral-600 font-mono text-xs bg-neutral-100 px-2 py-1 rounded inline-block mt-0.5">{user.id}</span>
+                                        <span className={`${field_label} mb-1`}>Player ID</span>
+                                        <span className="text-orange-200/80 font-mono text-xs bg-white/10 px-2.5 py-1 rounded inline-block mt-0.5 select-all">
+                                            {user.id}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
-
                         </div>
-
                     </div>
                 ) : null}
             </main>

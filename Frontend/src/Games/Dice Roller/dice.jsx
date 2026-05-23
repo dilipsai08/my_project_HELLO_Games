@@ -1,4 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+const gamePage =
+    "relative h-dvh w-full bg-[#013220] flex items-center justify-center font-sans text-white p-4 overflow-hidden box-border";
+const leaveButton =
+    "absolute top-4 left-4 px-4 py-2 rounded-xl bg-black/40 border border-orange-500/20 text-orange-400 font-bold hover:bg-orange-500 hover:text-white transition-all duration-300 flex items-center gap-2 cursor-pointer z-50 text-sm";
+const gamePanel =
+    "bg-[#002200] p-6 rounded-2xl border-2 border-[#FFA500] shadow-2xl w-full max-w-[400px] max-h-full flex flex-col justify-between";
+const scoreBox =
+    "p-3 rounded-xl flex-1 border-2 text-center transition-all duration-300 ease-in-out";
+const rollButton =
+    "w-full py-3 mt-2 text-xl font-bold text-white bg-[#FF3B3F] rounded-xl shadow-[0_4px_15px_rgba(255,59,63,0.4)] transition-all duration-100 ease-in-out disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:ring-offset-2 focus:ring-offset-[#002200]";
 
 const MAX_TURNS = 5;
 const TURN_TIME = 7;
@@ -17,8 +29,8 @@ const WinnerText = ({ winner }) => {
     
     return <p className="text-lg font-bold text-[#FFA500] m-0">{msg}</p>;
 };
-
 const Dice = () => {
+    const navigate = useNavigate();
     const [p1, setp1] = useState(0);
     const [p2, setp2] = useState(0);
     const [currentPlayer, setCurrentPlayer] = useState(0);
@@ -112,9 +124,17 @@ const Dice = () => {
     }
 
     return (
-        <div className="h-dvh w-full bg-[#013220] flex items-center justify-center font-sans text-white p-4 overflow-hidden box-border">
+        <div className={gamePage}>
             
-            <div className="bg-[#002200] p-6 rounded-2xl border-2 border-[#FFA500] shadow-2xl w-full max-w-[400px] max-h-full flex flex-col justify-between">
+            {/* Elegant Floating Escape Button */}
+            <button 
+                onClick={() => navigate("/play")}
+                className={leaveButton}
+            >
+                ← Leave Game
+            </button>
+            
+            <div className={gamePanel}>
                 
                 <div>
                     <h1 className="text-2xl font-bold text-[#FFD700] m-0 mb-4 tracking-wide text-center">
@@ -122,7 +142,7 @@ const Dice = () => {
                     </h1>
                     
                     <div className="flex justify-between space-x-3">
-                        <div className={`p-3 rounded-xl flex-1 border-2 text-center transition-all duration-300 ease-in-out ${
+                        <div className={`${scoreBox} ${
                             currentPlayer === 0 && !gameOver 
                                 ? "border-[#FF3B3F] bg-[rgba(255,59,63,0.15)] shadow-[0_0_10px_rgba(255,59,63,0.3)]" 
                                 : "border-[#003300] bg-black/20"
@@ -132,7 +152,7 @@ const Dice = () => {
                             <div className="text-xs mt-1 text-gray-400 font-medium">Turns: {p1_turns}/{MAX_TURNS}</div>
                         </div>
                         
-                        <div className={`p-3 rounded-xl flex-1 border-2 text-center transition-all duration-300 ease-in-out ${
+                        <div className={`${scoreBox} ${
                             currentPlayer === 1 && !gameOver 
                                 ? "border-[#FF3B3F] bg-[rgba(255,59,63,0.15)] shadow-[0_0_10px_rgba(255,59,63,0.3)]" 
                                 : "border-[#003300] bg-black/20"
@@ -164,7 +184,7 @@ const Dice = () => {
                     <button 
                         onClick={gameOver ? initialize_game : handle_tap}
                         disabled={isRolling}
-                        className="w-full py-3 mt-2 text-xl font-bold text-white bg-[#FF3B3F] rounded-xl shadow-[0_4px_15px_rgba(255,59,63,0.4)] transition-all duration-100 ease-in-out disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#FFA500] focus:ring-offset-2 focus:ring-offset-[#002200]"
+                        className={rollButton}
                     >
                         {gameOver ? "Play Again" : isRolling ? "Rolling..." : `P${currentPlayer + 1} Roll`}
                     </button>

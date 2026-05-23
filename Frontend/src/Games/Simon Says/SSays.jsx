@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import API from "../../Components/Protected compo/api";
 import correctMp3 from "./Correct.mp3";
 import gameOverMp3 from "./GameOver.mp3";
 
@@ -12,14 +14,59 @@ const tailwindColors = {
     blue: "bg-blue-500",
     green: "bg-green-500",
 };
+const gamePage =
+    "relative flex flex-col items-center min-h-screen pt-16 font-sans bg-linear-to-b from-green-950 to-gray-950 text-gray-100";
+const leaveButton =
+    "absolute top-4 left-4 px-4 py-2 rounded-xl bg-black/40 border border-orange-500/20 text-orange-400 font-bold hover:bg-orange-500 hover:text-white transition-all duration-300 flex items-center gap-2 cursor-pointer z-50 text-sm";
+const startButton =
+    "px-6 py-3 mb-10 text-lg font-bold text-white transition-colors duration-200 bg-green-600 rounded-lg shadow-lg hover:bg-green-500 focus:outline-none focus:ring-4 focus:ring-green-800";
+const colorButton =
+    "w-36 h-36 border-4 border-gray-950 rounded-3xl transition-opacity duration-150";
 
 function SimonSays() {
+    const navigate = useNavigate();
     const [seq, setseq] = useState([]);
     const [Useq, setUseq] = useState([]);
     const [Score, setScore] = useState(0);
     const [lvl, setlvl] = useState(0); 
     const [activeColor, setActiveColor] = useState(""); 
     const [isAuthorTapping, setIsAuthorTapping] = useState(false);
+
+    const [highScore, setHighScore] = useState(() => {
+        return parseInt(localStorage.getItem('simon_says_high_score') || '0', 10);
+    });
+
+    // Fetch current high score on mount from backend if available
+    useEffect(() => {
+        API.get("/api/check-auth")
+            .then(res => {
+                if (res.data.isAuthenticated && res.data.user) {
+                    const backendHighScore = res.data.user.high_score || 0;
+                    setHighScore(prev => Math.max(prev, backendHighScore));
+                }
+            })
+            .catch(err => {
+                console.log("Could not fetch high score from server, using local storage", err);
+            });
+    }, []);
+
+    const updateHighScore = (finalScore) => {
+        const localHighScore = parseInt(localStorage.getItem('simon_says_high_score') || '0', 10);
+        const newHigh = Math.max(localHighScore, finalScore, highScore);
+        setHighScore(newHigh);
+        localStorage.setItem('simon_says_high_score', newHigh.toString());
+
+        API.post("/api/update-high-score", { score: finalScore })
+        .then(res => {
+            console.log("High score updated on server:", res.data);
+            if (res.data && typeof res.data.highScore === 'number') {
+                setHighScore(prev => Math.max(prev, res.data.highScore));
+            }
+        })
+        .catch(err => {
+            console.error("Failed to update high score on server:", err);
+        });
+    };
 
     useEffect(() => {
         initialize_game();
@@ -97,6 +144,8 @@ function SimonSays() {
                 dyna_emoji = "Great! 🎉🎉🎉";
             }
             
+            updateHighScore(Score);
+            
             setTimeout(() => { 
                 alert(`Wrong tap, Game Over🙃 And You Scored ${Score} points ${dyna_emoji}`);
                 handle_game_end();
@@ -117,9 +166,18 @@ function SimonSays() {
     }
 
     return (
-        <div className="flex flex-col items-center min-h-screen pt-16 font-sans bg-gray-900 text-gray-100">
+        <div className={gamePage}>
             
-            <h1 className="mb-4 text-5xl font-extrabold tracking-tight">HELLO, Simon!</h1>
+            {/* Elegant Floating Escape Button */}
+            <button 
+                onClick={() => navigate("/play")}
+                className={leaveButton}
+            >
+                ← Leave Game
+            </button>
+            
+            <h1 className="mb-2 text-5xl font-extrabold tracking-tight">HELLO, Simon!</h1>
+            <h3 className="mb-4 text-xl font-bold text-yellow-400">High Score: {highScore}</h3>
             
             <div className="flex gap-8 mb-8 text-2xl font-semibold">
                 <h2>Level: {lvl}</h2>
@@ -128,7 +186,7 @@ function SimonSays() {
             
             <button 
                 onClick={handle_nxt_round} 
-                className="px-6 py-3 mb-10 text-lg font-bold text-white transition-colors duration-200 bg-green-600 rounded-lg shadow-lg hover:bg-green-500 focus:outline-none focus:ring-4 focus:ring-green-800"
+                className={startButton}
             >
                 Start Game
             </button>
@@ -140,7 +198,7 @@ function SimonSays() {
                         name={col}
                         onClick={handle_tap}
                         className={`
-                            w-36 h-36 border-4 border-gray-950 rounded-3xl transition-opacity duration-150
+                            ${colorButton}
                             ${tailwindColors[col]} 
                             ${activeColor === col ? "opacity-100 scale-105" : "opacity-40"} 
                             ${isAuthorTapping ? "cursor-not-allowed" : "cursor-pointer hover:opacity-75"}

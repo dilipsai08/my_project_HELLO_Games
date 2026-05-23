@@ -1,43 +1,75 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import Header from "../Components/header";
 import Footer from "../Components/footer";
 
+const abt_pge_css =
+    "min-h-screen flex flex-col bg-linear-to-b from-green-950 via-gray-950 to-black font-sans text-orange-100 overflow-x-hidden selection:bg-orange-500 selection:text-white";
+const glow_orange =
+    "absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-orange-500/5 blur-[120px] rounded-full pointer-events-none z-0";
+const glow_green =
+    "absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-96 h-96 bg-green-500/5 blur-[120px] rounded-full pointer-events-none z-0";
+const title_gradi =
+    "bg-linear-to-r from-orange-500 via-orange-400 to-yellow-300 bg-clip-text text-transparent drop-shadow-sm hover:from-yellow-300 hover:to-orange-500 transition-all duration-500";
+const overview_crd =
+    "relative overflow-hidden rounded-3xl border border-orange-500/15 bg-white/5 p-8 sm:p-12 backdrop-blur-md shadow-2xl mb-16 max-w-4xl mx-auto";
+const sta_play_btn =
+    "inline-flex px-8 py-4 rounded-full bg-linear-to-r from-orange-500 to-yellow-500 text-white font-extrabold text-lg hover:shadow-[0_0_25px_rgba(249,115,22,0.5)] hover:-translate-y-1 transition-all duration-300 cursor-pointer shadow-lg";
+
 function About() {
     return (
-        <div>
+        <div className={abt_pge_css}>
+            {/* background_glowing deco */}
+            <div className={glow_orange}></div>
+            <div className={glow_green}></div>
+
             <Header />
-            
-            <main style={{ maxWidth: "1000px", margin: "0 auto", padding: "60px 20px", fontFamily: "system-ui, -apple-system, sans-serif", color: "#333" }}>
-                
+
+            <main className="grow max-w-5xl mx-auto px-6 sm:px-8 py-16 md:py-24 relative z-10 w-full flex flex-col justify-center">
+
                 {/* Hero Section */}
-                <section style={{ textAlign: "center", marginBottom: "60px" }}>
-                    <h1 className="group cursor-pointer" style={{ fontSize: "3.5rem", fontWeight: "bold", marginBottom: "20px", color: "#111" }}>
-                        About <span className="bg-linear-to-r from-orange-600 to-yellow-400 bg-clip-text text-transparent group-hover:from-yellow-400 group-hover:to-orange-600 transition-all duration-500 tracking-tight">HELLO Games</span>
+                <section className="text-center mb-16 animate-fade-in">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-orange-500/20 bg-orange-500/10 backdrop-blur-md mb-6">
+                        <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
+                        <span className="text-xs font-semibold text-orange-300 uppercase tracking-widest">About the Platform</span>
+                    </div>
+
+                    <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight mb-6 cursor-default">
+                        About{" "}
+                        <span className={title_gradi}>
+                            HELLO Games
+                        </span>
                     </h1>
-                    <p style={{ fontSize: "1.3rem", color: "#666", maxWidth: "700px", margin: "0 auto", lineHeight: "1.6" }}>
-                        We build browser games. No downloads, no hassle.
+
+                    <p className="max-w-2xl text-lg md:text-xl text-orange-200/80 mx-auto leading-relaxed">
+                        We design beautiful, lightweight, and engaging browser games that require no downloads and provide pure instant brainstorming fun.
                     </p>
                 </section>
 
-                {/* Platform Overview */}
-                <div style={{ backgroundColor: "#f9f9f9", padding: "40px", borderRadius: "16px", border: "1px solid #eee", marginBottom: "80px", textAlign: "center" }}>
-                    <h2 style={{ fontSize: "2rem", marginBottom: "20px", color: "#222" }}>What We Do</h2>
-                    <p style={{ fontSize: "1.2rem", lineHeight: "1.8", color: "#555", maxWidth: "800px", margin: "0 auto" }}>
-                        Hello Games is a simple platform for web games. You can play everything directly in your browser. 
-                        We offer games that test your reflexes, memory, and logic. 
-                        Our goal is to make games that are easy to play and fun to master.
-                    </p>
+                {/* overview_section */}
+                <div className={overview_crd}>
+                    <div className="absolute inset-0 bg-green-500/5 blur-3xl rounded-full pointer-events-none"></div>
+                    <div className="relative z-10 text-center space-y-6">
+                        <h2 className="text-2xl sm:text-3xl font-extrabold text-white">What We Do</h2>
+                        <p className="text-orange-200/75 text-base sm:text-lg leading-relaxed max-w-3xl mx-auto">
+                            HELLO Games is a high-performance web gaming ecosystem built directly for modern web browsers.
+                            We host simple yet intensely satisfying mini-games designed to test your focus, reflex times, math speed, and mental focus.
+                            Our core goal is to deliver an arcade that is completely free, secure, and easily playable instantly on any desktop or mobile device.
+                        </p>
+                    </div>
                 </div>
 
-                {/* Call to Action */}
-                <section style={{ textAlign: "center", borderTop: "2px solid #f0f0f0", paddingTop: "60px", paddingBottom: "40px" }}>
-                    <h2 style={{ fontSize: "2.5rem", marginBottom: "20px", color: "#111" }}>Join the Arcade</h2>
-                    <p style={{ fontSize: "1.2rem", color: "#666", marginBottom: "30px", maxWidth: "600px", margin: "0 auto 40px auto", lineHeight: "1.6" }}>
-                        Create an account today to track your high scores across all our games, compete with friends, and climb the global leaderboards.
+                <section className="text-center pt-8 border-t border-green-800/20 max-w-3xl mx-auto w-full">
+                    <h2 className="text-3xl font-extrabold text-white mb-4">Join the Arcade</h2>
+                    <p className="text-orange-200/70 text-sm sm:text-base mb-8 max-w-xl mx-auto leading-relaxed">
+                        Register a free HELLO Games account today to track your stats, beat high scores, compete with the global community, and climb the scoreboard!
                     </p>
-                    <a href="/sign-up" style={{ display: "inline-block", backgroundColor: "#000", color: "white", padding: "15px 40px", borderRadius: "30px", textDecoration: "none", fontSize: "1.1rem", fontWeight: "bold", boxShadow: "0 4px 10px rgba(0,0,0,0.15)" }}>
+                    <Link
+                        to="/sign-up"
+                        className={sta_play_btn}
+                    >
                         Start Playing Now
-                    </a>
+                    </Link>
                 </section>
 
             </main>
@@ -46,4 +78,5 @@ function About() {
         </div>
     );
 }
+
 export default About;

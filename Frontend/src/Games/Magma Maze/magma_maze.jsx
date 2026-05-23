@@ -1,11 +1,23 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-// import axios from 'axios';
+import { useNavigate } from "react-router-dom";
+import API from "../../Components/Protected compo/api";
 import SunlightOnTheTiles from './Sunlight_on_the_Tiles.mp3';
 import GameWin from './Game_win.mp3';
 
 const GRID_SIZE = 10;
 const START_POS = { r: 9, c: 0 };
 const EXIT_POS = { r: 0, c: 9 };
+const gamePage =
+  "relative min-h-screen bg-linear-to-b from-green-950 to-gray-950 flex flex-col items-center justify-center font-mono selection:bg-transparent";
+const leaveButton =
+  "absolute top-4 left-4 px-4 py-2 rounded-xl bg-black/40 border border-orange-500/20 text-[#ffc30b] font-bold hover:bg-[#ffc30b] hover:text-black transition-all duration-300 flex items-center gap-2 cursor-pointer z-50 text-sm";
+const boardClass =
+  "relative grid grid-cols-10 gap-1 bg-black p-2 border-4 border-[#b22222] shadow-[0_0_30px_rgba(178,34,34,0.3)]";
+const endOverlay =
+  "absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-10 text-center p-4";
+const tileBase =
+  "w-10 h-10 flex items-center justify-center transition-all duration-300";
+
 const get_volcano_pos = (exi_vol = []) => {
   let r, c;
   let isSafe = false;
@@ -29,7 +41,8 @@ const initialize_game = () => {
   return { grid, volcanoes: [firstVolcano, secondVolcano] };
 };
 
-function LavaEscape() {
+function MagmaMaze() {
+  const navigate = useNavigate();
   const [playerPos, setPlayerPos] = useState(START_POS);
   const [gameState, setGameState] = useState('playing'); // 'playing', 'win', 'lose'
   const [stage, setStage] = useState(1);
@@ -41,6 +54,42 @@ function LavaEscape() {
   const [timer, setTimer] = useState(0);
   const [score, setscore] = useState(0);
   const [moves, setmoves] = useState(0);
+
+  const [highScore, setHighScore] = useState(() => {
+    return parseInt(localStorage.getItem('magma_maze_high_score') || '0', 10);
+  });
+
+  // Fetch current high score on mount from backend if available
+  useEffect(() => {
+    API.get("/api/check-auth")
+      .then(res => {
+        if (res.data.isAuthenticated && res.data.user) {
+          const backendHighScore = res.data.user.high_score || 0;
+          setHighScore(prev => Math.max(prev, backendHighScore));
+        }
+      })
+      .catch(err => {
+        console.log("Could not fetch high score from server, using local storage", err);
+      });
+  }, []);
+
+  const updateHighScore = (finalScore) => {
+    const localHighScore = parseInt(localStorage.getItem('magma_maze_high_score') || '0', 10);
+    const newHigh = Math.max(localHighScore, finalScore, highScore);
+    setHighScore(newHigh);
+    localStorage.setItem('magma_maze_high_score', newHigh.toString());
+
+    API.post("/api/update-high-score", { score: finalScore })
+    .then(res => {
+      console.log("High score updated on server:", res.data);
+      if (res.data && typeof res.data.highScore === 'number') {
+        setHighScore(prev => Math.max(prev, res.data.highScore));
+      }
+    })
+    .catch(err => {
+      console.error("Failed to update high score on server:", err);
+    });
+  };
 
   const handle_audio = useCallback(() => {
     if (!bgAudioRef.current) {
@@ -158,14 +207,16 @@ function LavaEscape() {
       setmoves(newMoves);
 
       if (r === EXIT_POS.r && c === EXIT_POS.c) {
-        setscore(handle_score(newMoves));
+        const finalScore = handle_score(newMoves);
+        setscore(finalScore);
         setGameState('win');
+        updateHighScore(finalScore);
       }
       else if (lavaGrid[r][c] === 1) {
         setGameState('lose');
       }
     }
-  }, [playerPos, gameState, lavaGrid, moves, handle_score]);
+  }, [playerPos, gameState, lavaGrid, moves, handle_score, highScore]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -184,43 +235,38 @@ function LavaEscape() {
     setGameState('playing');
   }, []);
 
-  // C++ 
-  const callCppEngine = async () => {
-    // if (gameState !== 'playing') return;
-    return;
-    const gridString = lavaGrid.map(row => row.join('')).join('');
-
-    console.log("Sending to Node/C++:", { R: GRID_SIZE, C: GRID_SIZE, gridStr: gridString });
-    alert("C++ Backend Call! Check console for the grid string format.");
-    try {
-      const response = await axios.post('', { // Node.js host https link 
-        R: GRID_SIZE, C: GRID_SIZE, gridStr: gridString, start: playerPos
-      });
-      console.log("C++ Engine Suggests Path:", response.data.path);
-    } catch (err) { console.error(err); }
-  };
-
-
   return (
-    <div className="min-h-screen bg-[#0f291e] flex flex-col items-center justify-center font-mono selection:bg-transparent">
+    <div className={gamePage}>
+      
+      {/* Elegant Floating Escape Button */}
+      <button 
+        onClick={() => navigate("/play")}
+        className={leaveButton}
+      >
+        ← Leave Game
+      </button>
 
       <div className="w-full max-w-md flex justify-between items-center mb-6 text-[#ffc30b]">
-        <h1 className="text-3xl font-extrabold tracking-wider drop-shadow-md">VOLCANO ESCAPE</h1>
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-wider drop-shadow-md">MAGMA MAZE</h1>
+          <p className="text-xs font-bold text-[#ff8c00]/80 mt-1">HIGH SCORE: {highScore}</p>
+        </div>
         <div className="text-right">
           <p className="text-lg font-bold text-[#ff8c00]">STAGE: {stage}</p>
         </div>
       </div>
 
-      <div className="relative grid grid-cols-10 gap-1 bg-black p-2 border-4 border-[#b22222] shadow-[0_0_30px_rgba(178,34,34,0.3)]">
+      <div className={boardClass}>
 
         {gameState !== 'playing' && (
-          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-10 text-center">
+          <div className={endOverlay}>
             <h2 className={`text-4xl font-bold mb-4 ${gameState === 'win' ? 'text-[#ffc30b]' : 'text-[#b22222]'}`}>
               {gameState === 'win' ? 'YOU ESCAPED!' : 'INCINERATED.'}
             </h2>
             {gameState === 'win' && (
               <p className="text-white mb-4">Score: {score} | Moves: {moves} | Time: {timer}s</p>
             )}
+            <p className="text-[#ffc30b] text-sm font-bold mb-4">YOUR HIGH SCORE: {highScore}</p>
             <button onClick={resetGame} className="px-6 py-2 bg-[#ff8c00] text-black font-bold hover:bg-[#ffc30b] transition-colors">
               PLAY AGAIN
             </button>
@@ -236,7 +282,7 @@ function LavaEscape() {
             return (
               <div
                 key={`${rIdx}-${cIdx}`}
-                className={`w-10 h-10 flex items-center justify-center transition-all duration-300
+                className={`${tileBase}
                   ${isPlayer ? 'bg-[#ffc30b] shadow-[0_0_15px_#ffc30b] z-10 scale-110 rounded-sm' : ''}
                   ${!isPlayer && isExit ? 'bg-white shadow-[0_0_15px_white] animate-pulse' : ''}
                   ${!isPlayer && !isExit && cell === 1 ? 'bg-[#b22222] shadow-[inset_0_0_10px_#5a0000]' : ''}
@@ -251,19 +297,12 @@ function LavaEscape() {
         )}
       </div>
 
-      <button
-        onClick={callCppEngine}
-        className="mt-8 px-8 py-3 bg-transparent border-2 border-[#ff8c00] text-[#ff8c00] font-bold tracking-widest hover:bg-[#ff8c00] hover:text-black transition-all shadow-[0_0_10px_rgba(255,140,0,0.5)]"
-      >
-        REQUEST AI PATH (C++)
-      </button>
-
-      <p className="mt-6 text-[#1a3b2b] font-bold text-sm">
-        USE WASD TO MOVE. (Moves: {moves})
+      <p className="mt-6 text-[#ff8c00] font-bold text-sm">
+        Use arrow keys to move. (Moves: {moves})
       </p>
 
     </div>
   );
 }
 
-export default LavaEscape;
+export default MagmaMaze;

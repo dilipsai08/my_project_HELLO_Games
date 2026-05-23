@@ -2,6 +2,7 @@ import express from "express";
 import axios from "axios";
 import cors from "cors";
 import dotenv from "dotenv";
+import crypto from "crypto";
 import Passport from "passport";
 import bcrypt, { hash } from "bcrypt";
 import bodyParser from "body-parser";
@@ -10,42 +11,83 @@ import session from "express-session";
 import GoogleStrategy from "passport-google-oauth2";
 import AmazonStrategy, { Strategy as AmazonStrategyClass } from "passport-amazon";
 import passport from "passport";
-import socketIO from "socket.io";
+import morgan from "morgan";
+import helmet from "helmet";
+import connectPgSimple from "connect-pg-simple";
+import { Resend } from "resend";
+// import socketIO from "socket.io";
 import db from "./db.js";
 import { isAuthenticated } from "./Middlewares/auth_middleware.js";
 import is_Valid from "./Middlewares/Validation_middleware.js";
 import Error_handler from "./Middlewares/error_middleware.js";
 import { registerOAuthUser } from "./Middlewares/oauth_helper.js";
-import { rateLimit } from "express-rate-limit";
 
 dotenv.config();
 const app = express();
 const port = 3000;
 const saltRounds = 10;
+const frontendURL = process.env.FRONTEND_URL || "http://localhost:5173";
+const backendURL = process.env.BACKEND_URL || `http://localhost:${port}`;
 
+app.use(helmet());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cors({
-    origin: "#",//we need to provide the url of the frontend here to communicate with backend
+    origin: frontendURL,//we need to provide the url of the frontend here to communicate with backend
     credentials: true,
 }));
-
+const pgSession = connectPgSimple(session);
 app.use(
     session({
         secret: process.env.SESSION_SECRET || "default_session_secret",
         resave: false,
         saveUninitialized: false,
+        store: new pgSession({
+            pool: db,
+            tableName: process.env.PG_SESSION,
+            pruneSessionInterval: 60 * 60,//it remove the expired session from the db
+        }),
         cookie: {
             maxAge: 30 * 24 * 60 * 60 * 1000,
             httpOnly: true,
-            secure: false, //it should be true while deploying to real server
+            secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
         }
     })
 );
 
+const resend = new Resend(process.env.RESEND_EMAIL_API_KEY);
+
 app.use(Passport.initialize());
 app.use(Passport.session());
+app.use(morgan("dev")); //morgan it show all the HTTPS request in the my dev console
+
+function getOAuthEmail(profile) {
+    const email = profile?.email || profile?.emails?.[0]?.value || profile?._json?.email;
+    if (Array.isArray(email)) {
+        return email[0] || null;
+    }
+    if (typeof email === 'string') {
+        return email;
+    }
+    return null;
+}
+
+function getOAuthName(profile) {
+    if (typeof profile?.displayName === 'string' && profile.displayName) {
+        return profile.displayName;
+    }
+    if (typeof profile?.name?.givenName === 'string' && profile.name.givenName) {
+        return profile.name.givenName;
+    }
+    if (typeof profile?.name === 'string' && profile.name) {
+        return profile.name;
+    }
+    if (typeof profile?._json?.name === 'string' && profile._json.name) {
+        return profile._json.name;
+    }
+    return "HELLO Player";
+}
 
 app.post("/register", is_Valid, async (req, res, next) => {
     const { email, password, username, name, phone } = req.body;
@@ -55,11 +97,27 @@ app.post("/register", is_Valid, async (req, res, next) => {
                 return next(err);
             }
             try {
-                await db.query(
-                    "INSERT INTO users (email, password, username, name, phone) VALUES ($1, $2, $3, $4, $5)", 
+                const result = await db.query(
+                    "INSERT INTO users (email, password, username, name, phone) VALUES ($1, $2, $3, $4, $5) RETURNING *",
                     [email, hash, username, name, phone]
                 );
-                return res.status(200).send("User registered successfully");
+                const user = result.rows[0];
+
+                // Clear the OTP from session on successful registration
+                req.session.otp = null;
+
+                    req.login(user, (loginErr) => {
+                        if (loginErr) {
+                            return next(loginErr);
+                        }
+                        req.session.save((saveErr) => {
+                            if (saveErr) {
+                                console.error("Error saving session on auto-sign-in:", saveErr);
+                                return next(saveErr);
+                            }
+                            return res.status(200).send("User registered successfully");
+                        });
+                    });
             } catch (dbErr) {
                 return next(dbErr);
             }
@@ -69,7 +127,54 @@ app.post("/register", is_Valid, async (req, res, next) => {
     }
 });
 
-app.post("/login", async (req, res, next) => {
+app.post("/api/otp", async (req, res, next) => {
+    const { email } = req.body;
+    const otp = crypto.randomInt(100000, 999999).toString();
+    if (!email || !email.includes('@')) {
+        return res.status(400).send("Invalid email");
+    }
+    const email_domain = ["gmail.com", "icloud.com", "outlook.com", "zoho.com"];
+    if (!email_domain.includes(email.split('@')[1])) {
+        return res.status(400).send("Invalid email domain");
+    }
+
+    try {
+        const result = await resend.emails.send({
+            from: process.env.EMAIL_FROM_ADDRESS || "HELLO Games <onboarding@resend.dev>",
+            to: [email],
+            subject: "Verification Code for HELLO Games",
+            html: `
+                <p>Your verification code (OTP) is: <strong>${otp}</strong></p>
+                <p>This code is valid for 10 minutes only.</p>
+                <p>For your security, please do not share this OTP with anyone.</p>
+                <p>Regards,</p>
+                <p>The HELLO Games Team</p>
+            `,
+        });
+
+        const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+
+        req.session.otp = {
+            otp: hashedOtp,
+            createdAt: new Date(),
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+            email: email,
+        };
+        req.session.save((err) => {
+            if (err) {
+                next(err);
+                return res.status(200).json({ success: false, message: "error in saving otp", error: err || "unknown error" });
+            }
+            console.log("Hashed OTP stored successfully in session.");
+            return res.status(200).json({ success: true, message: "OTP sent successfully" });
+        });
+
+    } catch (err) {
+        next(err);
+    }
+});
+
+app.post("/sign-in", async (req, res, next) => {
     const { email, password } = req.body;
     try {
         const check_user = await db.query("SELECT * FROM users WHERE email=$1", [email]);
@@ -84,7 +189,7 @@ app.post("/login", async (req, res, next) => {
                         if (loginErr) {
                             return next(loginErr);
                         }
-                        return res.status(200).send("Login successful🎉");
+                        return res.status(200).send("Sign in successful🎉");
                     });
                 } else {
                     return res.status(400).send("Invalid credentials😭");
@@ -98,28 +203,37 @@ app.post("/login", async (req, res, next) => {
     }
 });
 
+app.get("/logout", async (req, res) => {
+    req.logout(function (err) {
+        if (err) {
+            return next(err);
+        }
+        return res.status(200).send("logout successfull");
+    })
+})
+
 app.get("/api/check-auth", isAuthenticated, (req, res) => {
     res.status(200).json({ isAuthenticated: true, user: req.user });
 });
 
 app.get("/auth/google", passport.authenticate('google', {
-    scope: ['email', 'profile'],
-}));
-
-app.get('/auth/google/callback', passport.authenticate('google', {
-    failureRedirect: "/register",
-}), (req, res) => {
-    res.status(200).send("Login successful🎉");
-});
-
-app.get("/auth/amazon", passport.authenticate('amazon', {
     scope: ['profile', 'email'],
 }));
 
-app.get('/auth/amazon/callback', passport.authenticate('amazon', {
-    failureRedirect: "/register",
+app.get('/auth/google/callback', passport.authenticate('google', {
+    failureRedirect: `${frontendURL}/sign-up`,
 }), (req, res) => {
-    res.status(200).send("Login successful🎉");
+    res.redirect(`${frontendURL}/home`);
+});
+
+app.get("/auth/amazon", passport.authenticate('amazon', {
+    scope: ['profile'],
+}));
+
+app.get('/auth/amazon/callback', passport.authenticate('amazon', {
+    failureRedirect: `${frontendURL}/sign-up`,
+}), (req, res) => {
+    res.redirect(`${frontendURL}/home`);
 });
 
 passport.use("local", new localStrategy(async function verify(email, password, cb) {
@@ -148,13 +262,17 @@ passport.use("local", new localStrategy(async function verify(email, password, c
 }));
 
 passport.use("google", new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "http://localhost:3000/auth/google/callback",
+    clientID: process.env.GOOGLE_CLIENT_ID || "",
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    callbackURL: `${backendURL}/auth/google/callback`,
     userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo",
 }, async (accessToken, refreshToken, profile, cb) => {
     try {
-        const userEmail = profile.email || profile.email[0];
+        const userEmail = getOAuthEmail(profile);
+        if (!userEmail) {
+            return cb(null, false, { message: "Google did not return an email address." });
+        }
+
         const user_check = await db.query("SELECT * FROM users WHERE email=$1", [userEmail]);
         if (user_check.rows.length === 0) {
             const uniqueUsername = await registerOAuthUser(userEmail);
@@ -162,7 +280,7 @@ passport.use("google", new GoogleStrategy({
                 `INSERT INTO users (email, password, username, name, phone) 
                  VALUES ($1, $2, $3, $4, $5) 
                  RETURNING *`,
-                [userEmail, 'via Google OAuth', uniqueUsername, profile.name || profile.displayName, null]
+                [userEmail, 'via Google OAuth', uniqueUsername, getOAuthName(profile), null]
             );
             return cb(null, insertResult.rows[0]);
         } else {
@@ -176,11 +294,15 @@ passport.use("google", new GoogleStrategy({
 passport.use("amazon", new AmazonStrategy({
     clientID: process.env.AMAZON_CLIENT_ID || "",
     clientSecret: process.env.AMAZON_CLIENT_SECRET || "",
-    callbackURL: "http://localhost:3000/auth/amazon/callback",
+    callbackURL: `${backendURL}/auth/amazon/callback`,
     userProfileURL: "https://api.amazon.com/auth/userinfo",
 }, async (accessToken, refreshToken, profile, cb) => {
     try {
-        const userEmail = profile.email || profile.email[0];
+        const userEmail = getOAuthEmail(profile);
+        if (!userEmail) {
+            return cb(null, false, { message: "Amazon did not return an email address." });
+        }
+
         const user_check = await db.query("SELECT * FROM users WHERE email=$1", [userEmail]);
         if (user_check.rows.length === 0) {
             const uniqueUsername = await registerOAuthUser(userEmail);
@@ -188,7 +310,7 @@ passport.use("amazon", new AmazonStrategy({
                 `INSERT INTO users (email, password, username, name, phone) 
                  VALUES ($1, $2, $3, $4, $5) 
                  RETURNING *`,
-                [userEmail, 'via Amazon OAuth', uniqueUsername, profile.name || profile.displayName, null]
+                [userEmail, 'via Amazon OAuth', uniqueUsername, getOAuthName(profile), null]
             );
             return cb(null, insertResult.rows[0]);
         } else {
@@ -214,6 +336,39 @@ passport.deserializeUser(async (id, cb) => {
 
 
 
+
+app.post("/api/update-high-score", isAuthenticated, async (req, res, next) => {
+    const { score } = req.body;
+    const userId = req.user.id;
+    try {
+        const userQuery = await db.query("SELECT high_score, total_played FROM users WHERE id = $1", [userId]);
+        if (userQuery.rows.length > 0) {
+            const currentHighScore = userQuery.rows[0].high_score || 0;
+            const currentTotalPlayed = userQuery.rows[0].total_played || 0;
+
+            const newHighScore = Math.max(currentHighScore, Number(score));
+            const newTotalPlayed = currentTotalPlayed + 1;
+
+            await db.query(
+                "UPDATE users SET high_score = $1, total_played = $2 WHERE id = $3",
+                [newHighScore, newTotalPlayed, userId]
+            );
+
+            req.user.high_score = newHighScore;
+            req.user.total_played = newTotalPlayed;
+
+            return res.status(200).json({
+                message: "High score updated successfully",
+                highScore: newHighScore,
+                totalPlayed: newTotalPlayed
+            });
+        } else {
+            return res.status(404).send("User not found");
+        }
+    } catch (err) {
+        next(err);
+    }
+});
 
 app.use(Error_handler);
 
