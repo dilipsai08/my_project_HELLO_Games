@@ -1,6 +1,7 @@
 import { rateLimit } from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
 import { createClient } from "redis";
+import logger from "../utils/logger.js";
 
 const redis_client = createClient({
     url: process.env.REDIS_URL || "redis://localhost:6379",
@@ -8,8 +9,8 @@ const redis_client = createClient({
 });
 
 redis_client.connect()
-    .then(() => console.log("Redis connected successfully!"))
-    .catch((err) => console.error("Redis failed to connect:", err));
+    .then(() => logger.info("Redis connected successfully!"))
+    .catch((err) => logger.error("Redis failed to connect", err));
 
 const r_Store = new RedisStore({
     sendCommand: (...args) => redis_client.sendCommand(args)
@@ -23,7 +24,7 @@ export async function ban_check(req, res, next) {
             return;
         }
     } catch (err) {
-        console.error("Error checking IP ban status in Redis:", err);
+        logger.error("Error checking IP ban status in Redis", err);
     }
     next();
 }

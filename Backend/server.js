@@ -21,6 +21,7 @@ import { isAuthenticated } from "./Middlewares/auth_middleware.js";
 import is_Valid from "./Middlewares/Validation_middleware.js";
 import Error_handler from "./Middlewares/error_middleware.js";
 import { registerOAuthUser } from "./Middlewares/oauth_helper.js";
+import logger from "./utils/logger.js";
 
 dotenv.config();
 const app = express();
@@ -112,7 +113,7 @@ app.post("/register", is_Valid, async (req, res, next) => {
                         }
                         req.session.save((saveErr) => {
                             if (saveErr) {
-                                console.error("Error saving session on auto-sign-in:", saveErr);
+                                logger.error("Error saving session on auto-sign-in", saveErr);
                                 return next(saveErr);
                             }
                             return res.status(200).send("User registered successfully");
@@ -165,7 +166,7 @@ app.post("/api/otp", async (req, res, next) => {
                 next(err);
                 return res.status(200).json({ success: false, message: "error in saving otp", error: err || "unknown error" });
             }
-            console.log("Hashed OTP stored successfully in session.");
+            logger.info("Hashed OTP stored successfully in session.");
             return res.status(200).json({ success: true, message: "OTP sent successfully" });
         });
 
@@ -244,7 +245,7 @@ passport.use("local", new localStrategy(async function verify(email, password, c
         } else {
             bcrypt.compare(password, user_check.rows[0].password, (err, result) => {
                 if (err) {
-                    console.log(err);
+                    logger.error("Local strategy authentication comparison failed", err);
                     return cb(err);
                 }
                 else {
@@ -373,5 +374,5 @@ app.post("/api/update-high-score", isAuthenticated, async (req, res, next) => {
 app.use(Error_handler);
 
 app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+    logger.info(`Server is running on port ${port}`);
 });
