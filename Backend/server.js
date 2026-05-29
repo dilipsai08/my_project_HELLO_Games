@@ -37,6 +37,9 @@ app.use(cors({
     credentials: true,
 }));
 const pgSession = connectPgSimple(session);
+
+app.set("trust proxy", 1);
+
 app.use(
     session({
         secret: process.env.SESSION_SECRET || "default_session_secret",
@@ -51,7 +54,7 @@ app.use(
             maxAge: 30 * 24 * 60 * 60 * 1000,
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         }
     })
 );
