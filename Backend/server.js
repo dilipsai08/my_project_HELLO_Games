@@ -3,14 +3,13 @@ import axios from "axios";
 import cors from "cors";
 import dotenv from "dotenv";
 import crypto from "crypto";
-import Passport from "passport";
-import bcrypt, { hash } from "bcrypt";
+import passport from "passport";
+import bcrypt from "bcrypt";
 import bodyParser from "body-parser";
-import { Strategy as localStrategy } from "passport-local";
 import session from "express-session";
 import GoogleStrategy from "passport-google-oauth2";
-import AmazonStrategy, { Strategy as AmazonStrategyClass } from "passport-amazon";
-import passport from "passport";
+import AmazonStrategy from "passport-amazon";
+import { Strategy as localStrategy } from "passport-local";
 import morgan from "morgan";
 import helmet from "helmet";
 import connectPgSimple from "connect-pg-simple";
@@ -19,8 +18,15 @@ import db from "./db.js";
 import { isAuthenticated } from "./Middlewares/auth_middleware.js";
 import is_Valid from "./Middlewares/Validation_middleware.js";
 import Error_handler from "./Middlewares/error_middleware.js";
+import { Rate_limiter, OAuth_rate_limiter, ban_check } from "./Middlewares/RateLimiter_middleware.js";
 import { registerOAuthUser } from "./Middlewares/oauth_helper.js";
 import logger from "./utils/logger.js";
+
+const err_msg = (msg, statusCode, next) => {
+    const err = new Error(msg);
+    err.statusCode = statusCode;
+    return next(err);
+};
 
 dotenv.config();
 const app = express();
@@ -39,6 +45,7 @@ app.use(cors({
 const pgSession = connectPgSimple(session);
 
 app.set("trust proxy", 1);
+app.use(ban_check);
 
 app.use(
     session({
@@ -65,7 +72,7 @@ app.use(Passport.initialize());
 app.use(Passport.session());
 app.use(morgan("dev"));
 
-function getOAuthEmail(profile) {
+function get_email(profile) {
     const email = profile?.email || profile?.emails?.[0]?.value || profile?._json?.email;
     if (Array.isArray(email)) {
         return email[0] || null;
@@ -76,7 +83,7 @@ function getOAuthEmail(profile) {
     return null;
 }
 
-function getOAuthName(profile) {
+function get_name(profile) {
     if (typeof profile?.displayName === 'string' && profile.displayName) {
         return profile.displayName;
     }
@@ -89,55 +96,48 @@ function getOAuthName(profile) {
     if (typeof profile?._json?.name === 'string' && profile._json.name) {
         return profile._json.name;
     }
-    return "HELLO Player";
+    return `HELLO Player${Math.floor(100 + Math.random() * 1000)}`;
 }
 
-app.post("/register", is_Valid, async (req, res, next) => {
+app.post("/register", Rate_limiter, is_Valid, async (req, res, next) => {
     const { email, password, username, name, phone } = req.body;
     try {
-        bcrypt.hash(password, saltRounds, async (err, hash) => {
-            if (err) {
-                return next(err);
-            }
-            try {
-                const result = await db.query(
-                    "INSERT INTO users (email, password, username, name, phone) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-                    [email, hash, username, name, phone]
-                );
-                const user = result.rows[0];
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        
+        const result = await db.query(
+            "INSERT INTO users (email, password, username, name, phone) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+            [email, hashedPassword, username, name, phone]
+        );
+        const user = result.rows[0];
 
-                req.session.otp = null;
+        req.session.otp = null;
 
-                    req.login(user, (loginErr) => {
-                        if (loginErr) {
-                            return next(loginErr);
-                        }
-                        req.session.save((saveErr) => {
-                            if (saveErr) {
-                                logger.error("Error saving session on auto-sign-in", saveErr);
-                                return next(saveErr);
-                            }
-                            return res.status(200).send("User registered successfully");
-                        });
-                    });
-            } catch (dbErr) {
-                return next(dbErr);
+        req.login(user, (loginErr) => {
+            if (loginErr) {
+                return next(loginErr);
             }
+            req.session.save((saveErr) => {
+                if (saveErr) {
+                    logger.error("Error saving session on auto-sign-in", saveErr);
+                    return next(saveErr);
+                }
+                return res.status(200).json({ success: true, message: "User registered successfully" });
+            });
         });
     } catch (err) {
         next(err);
     }
 });
 
-app.post("/api/otp", async (req, res, next) => {
+app.post("/api/otp", Rate_limiter, async (req, res, next) => {
     const { email } = req.body;
     const otp = crypto.randomInt(100000, 999999).toString();
     if (!email || !email.includes('@')) {
-        return res.status(400).send("Invalid email");
+        return err_msg("Invalid email", 400, next);
     }
-    const email_domain = ["gmail.com", "icloud.com", "outlook.com", "zoho.com"];
+    const email_domain = ["gmail.com", "icloud.com", "outlook.com", "zoho.com", "yahoo.com"];
     if (!email_domain.includes(email.split('@')[1])) {
-        return res.status(400).send("Invalid email domain");
+        return err_msg("Invalid email domain", 400, next);
     }
 
     try {
@@ -164,8 +164,7 @@ app.post("/api/otp", async (req, res, next) => {
         };
         req.session.save((err) => {
             if (err) {
-                next(err);
-                return res.status(200).json({ success: false, message: "error in saving otp", error: err || "unknown error" });
+                return next(err);
             }
             logger.info("Hashed OTP stored successfully in session.");
             return res.status(200).json({ success: true, message: "OTP sent successfully" });
@@ -176,69 +175,56 @@ app.post("/api/otp", async (req, res, next) => {
     }
 });
 
-app.post("/sign-in", async (req, res, next) => {
-    const { email, password } = req.body;
-    try {
-        const check_user = await db.query("SELECT * FROM users WHERE email=$1", [email]);
-        if (check_user.rows.length > 0) {
-            const user = check_user.rows[0];
-            bcrypt.compare(password, user.password, (err, result) => {
-                if (err) {
-                    return next(err);
-                }
-                if (result) {
-                    req.login(user, (loginErr) => {
-                        if (loginErr) {
-                            return next(loginErr);
-                        }
-                        return res.status(200).send("Sign in successful🎉");
-                    });
-                } else {
-                    return res.status(400).send("Invalid credentials😭");
-                }
-            });
-        } else {
-            return res.status(400).send("NO user found, Register to continue...");
-        }
-    } catch (err) {
-        next(err);
-    }
+app.post("/sign-in", Rate_limiter, async (req, res, next) => {
+    passport.authenticate('local',(err, user, info)=>{
+        if(err) return next(err);
+        if(!user) return err_msg(info.message||"invalid credentials",400,next);
+
+        req.login(user,(loginErr)=>{
+            if(loginErr) return next(loginErr);
+            req.session.save((saveErr)=>{
+                if(saveErr) return next(saveErr);
+                return res.status(200).json({success:true,message:"Login successfull 🎉"});
+                
+            })
+        })
+    })(req, res, next);
 });
 
-app.get("/logout", async (req, res) => {
+app.get("/logout", async (req, res, next) => {
     req.logout(function (err) {
         if (err) {
             return next(err);
         }
-        return res.status(200).send("logout successfull");
-    })
-})
+        return res.status(200).json({ success: true, message: "logout successfull" });
+    });
+});
 
 app.get("/api/check-auth", isAuthenticated, (req, res) => {
     res.status(200).json({ isAuthenticated: true, user: req.user });
 });
 
-app.get("/auth/google", passport.authenticate('google', {
+app.get("/auth/google", OAuth_rate_limiter, passport.authenticate('google', {
     scope: ['profile', 'email'],
 }));
 
-app.get('/auth/google/callback', passport.authenticate('google', {
+app.get('/auth/google/callback', OAuth_rate_limiter, passport.authenticate('google', {
     failureRedirect: `${frontendURL}/sign-up`,
 }), (req, res) => {
     res.redirect(`${frontendURL}/home`);
 });
 
-app.get("/auth/amazon", passport.authenticate('amazon', {
+app.get("/auth/amazon", OAuth_rate_limiter, passport.authenticate('amazon', {
     scope: ['profile'],
 }));
 
-app.get('/auth/amazon/callback', passport.authenticate('amazon', {
+app.get('/auth/amazon/callback', OAuth_rate_limiter, passport.authenticate('amazon', {
     failureRedirect: `${frontendURL}/sign-up`,
 }), (req, res) => {
     res.redirect(`${frontendURL}/home`);
 });
 
-passport.use("local", new localStrategy(async function verify(email, password, cb) {
+passport.use("local", new localStrategy({ usernameField: 'email' }, async function verify(email, password, cb) {
     try {
         const user_check = await db.query("SELECT * FROM users WHERE email=$1", [email]);
         if (user_check.rows.length == 0) {
@@ -270,19 +256,19 @@ passport.use("google", new GoogleStrategy({
     userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo",
 }, async (accessToken, refreshToken, profile, cb) => {
     try {
-        const userEmail = getOAuthEmail(profile);
-        if (!userEmail) {
+        const user_email = get_email(profile);
+        if (!user_email) {
             return cb(null, false, { message: "Google did not return an email address." });
         }
 
-        const user_check = await db.query("SELECT * FROM users WHERE email=$1", [userEmail]);
+        const user_check = await db.query("SELECT * FROM users WHERE email=$1", [user_email]);
         if (user_check.rows.length === 0) {
-            const uniqueUsername = await registerOAuthUser(userEmail);
+            const uniqueUsername = await registerOAuthUser(user_email);
             const insertResult = await db.query(
                 `INSERT INTO users (email, password, username, name, phone) 
                  VALUES ($1, $2, $3, $4, $5) 
                  RETURNING *`,
-                [userEmail, 'via Google OAuth', uniqueUsername, getOAuthName(profile), null]
+                [user_email, 'via Google OAuth', uniqueUsername, get_name(profile), null]
             );
             return cb(null, insertResult.rows[0]);
         } else {
@@ -300,19 +286,19 @@ passport.use("amazon", new AmazonStrategy({
     userProfileURL: "https://api.amazon.com/auth/userinfo",
 }, async (accessToken, refreshToken, profile, cb) => {
     try {
-        const userEmail = getOAuthEmail(profile);
-        if (!userEmail) {
+        const user_email = get_email(profile);
+        if (!user_email) {
             return cb(null, false, { message: "Amazon did not return an email address." });
         }
 
-        const user_check = await db.query("SELECT * FROM users WHERE email=$1", [userEmail]);
+        const user_check = await db.query("SELECT * FROM users WHERE email=$1", [user_email]);
         if (user_check.rows.length === 0) {
-            const uniqueUsername = await registerOAuthUser(userEmail);
+            const uniqueUsername = await registerOAuthUser(user_email);
             const insertResult = await db.query(
                 `INSERT INTO users (email, password, username, name, phone) 
                  VALUES ($1, $2, $3, $4, $5) 
                  RETURNING *`,
-                [userEmail, 'via Amazon OAuth', uniqueUsername, getOAuthName(profile), null]
+                [user_email, 'via Amazon OAuth', uniqueUsername, get_name(profile), null]
             );
             return cb(null, insertResult.rows[0]);
         } else {
@@ -365,7 +351,7 @@ app.post("/api/update-high-score", isAuthenticated, async (req, res, next) => {
                 totalPlayed: newTotalPlayed
             });
         } else {
-            return res.status(404).send("User not found");
+            return err_msg("User not found", 404, next);
         }
     } catch (err) {
         next(err);

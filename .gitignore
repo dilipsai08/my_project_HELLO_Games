@@ -7,3 +7,6 @@ Frontend/src/Components/my-app/node_modules/
 node_modules
 trash.txt
 Backend/utils/logs/
+*.pem
+Frontend/.env*
+*.tar.gz

@@ -81,7 +81,8 @@ function SignUp() {
             }
         } catch (error) {
             console.error("Error sending OTP:", error);
-            setErrorMsg(error.response?.data || "Failed to send OTP. Please check your connection.");
+            const serverMsg = error.response?.data?.message || error.response?.data;
+            setErrorMsg(typeof serverMsg === 'string' ? serverMsg : "Failed to send OTP. Please check your connection.");
             setOtpSentText("Send OTP");
         }
     };
@@ -121,7 +122,8 @@ function SignUp() {
             }, 2000);
         } catch (error) {
             console.error("Registration error:", error);
-            setErrorMsg(error.response?.data || "Failed to register user. Please check your details.");
+            const serverMsg = error.response?.data?.message || error.response?.data;
+            setErrorMsg(typeof serverMsg === 'string' ? serverMsg : "Failed to register user. Please check your details.");
         } finally {
             setIsLoading(false);
         }

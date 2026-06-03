@@ -39,8 +39,8 @@ function SignIn() {
             })
             .catch(error => {
                 console.error("Sign in error:", error);
-                setErrorMsg(error.response?.data || "Invalid email or password.");
-                navigate("/sign-in");
+                const serverMsg = error.response?.data?.message || error.response?.data;
+                setErrorMsg(typeof serverMsg === 'string' ? serverMsg : "Invalid email or password.");
             })
             .finally(() => {
                 setIsLoading(false);

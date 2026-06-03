@@ -20,29 +20,49 @@ export async function ban_check(req, res, next) {
         const ip = req.ip;
         const is_banned = await redis_client.get(`banned:${ip}`);
         if (is_banned) {
-            res.status(403).send("You are banned from accessing this service!");
-            return;
+            const err = new Error("You have been banned.");
+            err.statusCode = 403;
+            return next(err);
         }
     } catch (err) {
         logger.error("Error checking IP ban status in Redis", err);
+        return next(err);
     }
     next();
 }
 export const Rate_limiter= rateLimit({
     windowMs:5*60*1000,
     limit:100,
-    message:{
-        error:"Too many requests from this IP, please try again later",
-        status:429,
-    },
+    standardHeaders:true,
+    legacyHeaders:false,
     store: r_Store,
+    handler: async (req,res, next)=>{
+        try{
+            await redis_client.setEx(req.ip,2*24*60*60,"banned");
+            const err = new Error("Too many requests, you are banned for 48 hrs");
+            err.statusCode = 429;
+            return next(err);
+        }catch(err){
+            logger.error("Error in rate limiter handler:", err);
+            return next(err);
+        }
+    },
 })
 export const  OAuth_rate_limiter= rateLimit({
     windowMs:5*60*1000,
     limit:100,
-    message:{
-        error:"Too many requests from this IP, please try again later",
-        status:429,
-    },
+    standardHeaders:true,
+    legacyHeaders:false,
     store: r_Store,
+    handler: async (req,res, next)=>{
+        try{
+            await redis_client.setEx(req.ip,2*24*60*60,"banned");
+            const err = new Error("Too many requests; you are banned for 48 hours.");
+            err.statusCode = 429;
+            return next(err);
+        }catch(err){
+            logger.error("Error in rate limiter handler:", err);
+            return next(err);
+        }
+    },
 })
